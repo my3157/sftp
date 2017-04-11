@@ -56,9 +56,9 @@ func (c *clientConn) loop() {
 // appropriate channel.
 func (c *clientConn) recv() error {
 	defer func() {
-		c.Lock()
+		c.conn.Lock()
 		c.conn.Close()
-		c.Unlock()
+		c.conn.Unlock()
 	}()
 	for {
 		typ, data, err := c.recvPacket()
@@ -102,11 +102,13 @@ func (c *clientConn) sendPacket(p idmarshaler) (byte, []byte, error) {
 func (c *clientConn) dispatchRequest(ch chan<- result, p idmarshaler) {
 	c.Lock()
 	c.inflight[p.id()] = ch
+	c.Unlock()
 	if err := c.conn.sendPacket(p); err != nil {
+		c.Lock()
 		delete(c.inflight, p.id())
+		c.Unlock()
 		ch <- result{err: err}
 	}
-	c.Unlock()
 }
 
 // broadcastErr sends an error to all goroutines waiting for a response.
